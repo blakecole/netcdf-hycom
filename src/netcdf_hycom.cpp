@@ -6,6 +6,7 @@
 /************************************************************/
 
 #include <iostream>
+#include <cstdlib>
 #include <string>
 #include <netcdf>
 using namespace std;
@@ -15,7 +16,7 @@ using namespace netCDF::exceptions;
 // Return this code to the OS in case of failure.
 static const int NC_ERR = 2;
 
-int main(void){
+int main(int argc, char **argv){
   try{
     //---------------------------------------------------------------
     // 1. OPEN NETCDF FILE
@@ -66,8 +67,8 @@ int main(void){
     int depth_size = depthDim.getSize();
     float DEPTH[depth_size];
     depthVar.getVar(DEPTH);
-    cout << "  depth = [" << DEPTH[0] << ":" << DEPTH[depth_size-1]
-         << "]        [n=" << depth_size << "]" << endl;
+    cout << "  depth = " << DEPTH[0] << ":" << DEPTH[depth_size-1]
+         << "        [n=" << depth_size << "]" << endl;
 
     // 3.2: Latitude
     latVar = dataFile.getVar("lat");
@@ -77,8 +78,8 @@ int main(void){
     int lat_size = latDim.getSize();
     float LAT[lat_size];
     latVar.getVar(LAT);
-    cout << "  lat   = [" << LAT[0] << ":" << LAT[lat_size-1]
-         << "]        [n=" << lat_size << "]" << endl;
+    cout << "  lat   = " << LAT[0] << ":" << LAT[lat_size-1]
+         << "        [n=" << lat_size << "]" << endl;
     
     // 3.3: Longitude
     lonVar = dataFile.getVar("lon");
@@ -88,8 +89,8 @@ int main(void){
     int lon_size = lonDim.getSize();
     float LON[lon_size];
     lonVar.getVar(LON);
-    cout << "  lon   = [" << LON[0] << ":" << LON[lon_size-1]
-         << "]      [n=" << lon_size << "]" << endl;
+    cout << "  lon   = " << LON[0] << ":" << LON[lon_size-1]
+         << "      [n=" << lon_size << "]" << endl;
 
     // 3.4: Time
     timeVar = dataFile.getVar("time");
@@ -99,8 +100,8 @@ int main(void){
     int time_size = timeDim.getSize();
     float TIME[time_size];
     timeVar.getVar(TIME);
-    cout << "  time  = [" << TIME[0] << ":" << TIME[time_size-1]
-         << "] [n=" << time_size << "]" << endl;
+    cout << "  time  = " << TIME[0] << ":" << TIME[time_size-1]
+         << " [n=" << time_size << "]" << endl;
     cout << endl;
 
     //---------------------------------------------------------------
@@ -108,44 +109,212 @@ int main(void){
     //---------------------------------------------------------------
     
     //---------------------------------------------------------------
-    // 4.1: Determine indices of desired LAT/LON range
-    float lat_low = 42;
-    float lat_high = 43.5;
-    float lon_low = 291;
-    float lon_high = 294;
+    // 4.1.1: Read spatial/temporal range from command line
+    int tau_min, tau_max;
+    float depth_min, depth_max;
+    float lat_min, lat_max;
+    float lon_min, lon_max;
+    int nparams = 0;
+    for (int i=1; i<argc; i++){
+      string input;
+      string argi = argv[i];
+      cout << "argv[" << i << "] = " << argi << endl;
+      if(argi.find("--time=current") == 0){
+        tau_min = 0;
+        tau_max = 0;
+        nparams+=2;
+      }
+      else if(argi.find("--hours=") == 0){
+        input = argi.substr(8);
+        tau_min = 0;
+        tau_max = atoi(input.c_str());
+        nparams+=2;
+      }
+      else if(argi.find("--days=") == 0){
+        input = argi.substr(7);
+        tau_min = 0;
+        tau_max = atoi(input.c_str())*24 - 1;
+        nparams+=2;
+      }
+      else if(argi.find("--weeks=") == 0){
+        input = argi.substr(8);
+        tau_min = 0;
+        tau_max = atoi(input.c_str())*24*7 - 1;
+        nparams+=2;
+      }
+      else if(argi.find("--tmin=") == 0){
+        input = argi.substr(7);
+        tau_min = atoi(input.c_str());
+        nparams++;
+      }
+      else if(argi.find("--tmax=") == 0){
+        input = argi.substr(7);
+        tau_max = atof(input.c_str());
+        nparams++;
+      }
+      else if(argi.find("--depthmin=") == 0){
+        input = argi.substr(11);
+        depth_min = atof(input.c_str());
+        nparams++;
+      }
+      else if(argi.find("--depthmax=") == 0){
+        input = argi.substr(11);
+        depth_max = atof(input.c_str());
+        nparams++;
+      }
+      else if(argi.find("--latmin=") == 0){
+        input = argi.substr(9);
+        lat_min = atof(input.c_str());
+        nparams++;
+      }
+      else if(argi.find("--latmax=") == 0){
+        input = argi.substr(9);
+        lat_max = atof(input.c_str());
+        nparams++;
+      }
+      else if(argi.find("--lonmin=") == 0){
+        input = argi.substr(9);
+        lon_min = atof(input.c_str());
+        nparams++;
+      }
+      else if(argi.find("--lonmax=") == 0){
+        input = argi.substr(9);
+        lon_max = atof(input.c_str());
+        nparams++;
+      }
+    }
 
-    int lat_ind_low=0, lat_ind_high=0;
-    while (LAT[lat_ind_high] < lat_high)
+    //4.1.2: If command line fails, manually input bounds
+    if (nparams != 8){
+      cout << "\n(!) ERROR: EXACTLY (8) PARAMETERS REQUIRED (!)\n"
+           << "                   (" << nparams << ") PARAMETERS PROVIDED.\n"
+           << "PLEASE MANUALLY DEFINE SUBSET BOUNDS BELOW.\n" << endl;
+      
+      cout << "  1. Time Start [hours since analysis]" << " [0:" << time_size << "]: ";
+      cin >> tau_max;
+
+      if ((tau_max > time_size)||(tau_max < 0)){
+        cout << "WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. TRY AGAIN.\n";
+        cout << "  1. Time Start [hours since analysis]" << " [0:" << time_size << "]: ";
+        cin >> tau_max;
+      }
+        
+      cout << "  2. Time Stop [hours since analysis]" << " [0:" << time_size << "]: ";
+      cin >> tau_min;
+      if ((tau_min > time_size)||(tau_min < 0)){
+        cout << "WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. TRY AGAIN.\n";
+        cout << "  2. Time Stop [hours since analysis]" << " [0:" << time_size << "]: ";
+        cin >> tau_min;
+      }
+
+      if (tau_min > tau_max){
+        cout << "WARNING: 'Time Start' must exceed 'Time Stop'.\n";
+        cout << "  Time Start [hours since analysis]"
+             << " [0:" << time_size << "]: ";
+        cin >> tau_max;
+        cout << "  Time Stop [hours since analysis]"
+             << " [0:" << time_size << "]: ";
+        cin >> tau_min;
+      }
+
+      cout << "  3. Minimum Depth [meters] [" << DEPTH[0] << ":" << DEPTH[depth_size-1] << "]: ";
+      cin >> depth_min;
+      if ((depth_min < DEPTH[0])||(depth_min > DEPTH[depth_size-1])){
+        cout << "WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. TRY AGAIN.\n";
+        cout << "  3. Minimum Depth [meters] [" << DEPTH[0] << ":" << DEPTH[depth_size-1] << "]: ";
+        cin >> depth_min;
+      }
+      cout << "  4. Maximum Depth [meters] [" << DEPTH[0] << ":" << DEPTH[depth_size-1] << "]: ";
+      cin >> depth_max;
+      if ((depth_max < DEPTH[0])||(depth_max > DEPTH[depth_size-1])){
+        cout << "WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. TRY AGAIN.\n";
+        cout << "  4. Maximum Depth [meters] [" << DEPTH[0] << ":" << DEPTH[depth_size-1] << "]: ";
+        cin >> depth_max;
+      }
+
+      cout << "  5. Minimum Latitude [degrees] [" << LAT[0] << ":" << LAT[lat_size-1] << "]: ";
+      cin >> lat_min;
+      if ((lat_min < LAT[0])||(lat_min > LAT[lat_size-1])){
+        cout << "WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. TRY AGAIN.\n";
+        cout << "  5. Minimum Latitude [degrees] [" << LAT[0] << ":" << LAT[lat_size-1] << "]: ";
+        cin >> lat_min;
+      }
+      cout << "  6. Maximum Latitude [degrees] [" << LAT[0] << ":" << LAT[lat_size-1] << "]: ";
+      cin >> lat_max;
+      if ((lat_max < LAT[0])||(lat_max > LAT[lat_size-1])){
+        cout << "WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. TRY AGAIN.\n";
+        cout << "  6. Maximum Latitude [degrees] [" << LAT[0] << ":" << LAT[lat_size-1] << "]: ";
+        cin >> lat_max;
+      }
+        
+      cout << "  7. Minimum Longitude [degrees] [" << LON[0] << ":" << LON[lon_size-1] << "]: ";
+      cin >> lon_min;
+      if ((lon_min < LON[0])||(lon_min > LON[lon_size-1])){
+        cout << "WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. TRY AGAIN.\n";
+        cout << "  7. Minimum Longitude [degrees] [" << LON[0] << ":" << LON[lon_size-1] << "]: ";
+        cin >> lon_min;
+      }
+        
+      cout << "  8. Maximum Longitude [degrees] [" << LON[0] << ":" << LON[lon_size-1] << "]: ";
+      cin >> lon_max;
+      if ((lon_max < LON[0])||(lon_max > LON[lon_size-1])){
+        cout << "WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. TRY AGAIN.\n";
+        cout << "  8. Maximum Longitude [degrees] [" << LON[0] << ":" << LON[lon_size-1] << "]: ";
+        cin >> lon_max;
+      }
+              
+    }
+
+    // 4.1.3: Search for closest HYCOM values
+    int depth_ind_high=0;
+    while (DEPTH[depth_ind_high] < depth_max)
+      depth_ind_high++;
+    int depth_ind_low=0;
+    while (DEPTH[depth_ind_low] < depth_min)
+      depth_ind_low++;
+
+    int lat_ind_high=0;
+    while (LAT[lat_ind_high] < lat_max)
       lat_ind_high++;
-    while (LAT[lat_ind_low] < lat_low)
+    int lat_ind_low=0;
+    while (LAT[lat_ind_low] < lat_min)
       lat_ind_low++;
-    int lon_ind_low=0, lon_ind_high=0;
-    while (LON[lon_ind_high] < lon_high)
+    
+    int lon_ind_high=0;
+    while (LON[lon_ind_high] < lon_max)
       lon_ind_high++;
-    while (LON[lon_ind_low] < lon_low)
+    int lon_ind_low=0;
+    while (LON[lon_ind_low] < lon_min)
       lon_ind_low++;
 
     cout << "-----------------------\n";
     cout << "SPATIAL RANGE:" << endl;
     cout << "Requested:\n";
-    cout << "  LAT = " << lat_low << ":" << lat_high << "\n";
-    cout << "  LON = " << lon_low << ":" << lon_high << "\n";
+    cout << "  LAT   = " << lat_min << ":" << lat_max << "\n";
+    cout << "  LON   = " << lon_min << ":" << lon_max << "\n";
+    cout << "  DEPTH = " << depth_min << ":" << depth_max << "\n";
+    
     cout << "Actual:\n";
     cout << "  LAT[" << lat_ind_low << ":" << lat_ind_high << "] = "
          << LAT[lat_ind_low] << ":" << LAT[lat_ind_high] << "\n";
     cout << "  LON[" << lon_ind_low << ":" << lon_ind_high << "] = "
          << LON[lon_ind_low] << ":" << LON[lon_ind_high] << "\n";
+    cout << "  DEPTH[" << depth_ind_low << ":" << depth_ind_high << "] = "
+         << DEPTH[depth_ind_low] << ":" << DEPTH[depth_ind_high] << "\n";
     cout << endl;
 
-    int lat_ind_range = lat_ind_high - lat_ind_low +1; //+1 for inclusive
-    int lon_ind_range = lon_ind_high - lon_ind_low +1; //+1 for inclusive
+    // Index Ranges (+1 for inclusive)
+    int lat_ind_range = lat_ind_high - lat_ind_low +1;
+    int lon_ind_range = lon_ind_high - lon_ind_low +1;
+    int depth_ind_range = depth_ind_high - depth_ind_low +1;
+    int ntime = tau_max - tau_min + 1;
 
     //---------------------------------------------------------------
     // 4.2: Initialize 3D arrays
-    short int preSALT[depth_size][lat_ind_range][lon_ind_range];
-    short int preTEMP[depth_size][lat_ind_range][lon_ind_range];
-    float SALT[depth_size][lat_ind_range][lon_ind_range];
-    float TEMP[depth_size][lat_ind_range][lon_ind_range];
+    short int preSALT[depth_ind_range][lat_ind_range][lon_ind_range];
+    short int preTEMP[depth_ind_range][lat_ind_range][lon_ind_range];
+    float SALT[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
+    float TEMP[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
 
     NcVar saltVar, tempVar;
     saltVar = dataFile.getVar("salinity");
@@ -159,14 +328,14 @@ int main(void){
     //---------------------------------------------------------------
     // 4.3: Write vectors to specify desired 4D data range
     vector<size_t> startp,countp;
-    startp.push_back(time_size-1);   //start: time  = most recent
-    startp.push_back(0);             //start: depth = 0
+    startp.push_back(0);             //start: overwritten in step (4.5)
+    startp.push_back(depth_ind_low); //start: depth = shallow depth index
     startp.push_back(lat_ind_low);   //start: lat   = low lat index
     startp.push_back(lon_ind_low);   //start: lon   = low lon index
-    countp.push_back(1);             //count: most recent time only
-    countp.push_back(depth_size);    //count: all depths
-    countp.push_back(lat_ind_range); //count: latitude index range
-    countp.push_back(lon_ind_range); //count: longitude index range
+    countp.push_back(1);               //count: one record at a time
+    countp.push_back(depth_ind_range); //count: depth index range
+    countp.push_back(lat_ind_range);   //count: latitude index range
+    countp.push_back(lon_ind_range);   //count: longitude index range
 
     for (int i=0; i<4; i++){
       cout << "startp[" << i << "] = " << startp[i] << endl;
@@ -210,36 +379,41 @@ int main(void){
     cout << "Salinity Scale, Offset = "
          << scale_factor_SALT[0] << "," << add_offset_SALT[0] << endl;
 
-    //---------------------------------------------------------------
-    // 4.5: Fill data arrays
-    saltVar.getVar(startp,countp,preSALT);
-    tempVar.getVar(startp,countp,preTEMP);
-    
 
     //---------------------------------------------------------------
-    // 4.6: Multiply by scale factor, add offset
-    for (int i=0; i<depth_size; i++)
-      for (int j=0; j<lat_ind_range; j++)
-        for (int k=0; k<lon_ind_range; k++){
+    // 4.5: Fill data arrays, multiply by scale factor, add offset
+    for (int rec=0; rec<ntime; rec++){
+      startp[0] = (time_size-1) - tau_max + rec;
+      cout << "startp[0] = " << startp[0] << endl;
+      cout << "countp[0] = " << countp[0] << endl;
+      saltVar.getVar(startp,countp,preSALT);
+      tempVar.getVar(startp,countp,preTEMP);
+      
+      for (int i=0; i<depth_ind_range; i++){
+        for (int j=0; j<lat_ind_range; j++){
+          for (int k=0; k<lon_ind_range; k++){
 
           if (preTEMP[i][j][k] != no_val_TEMP[0])
-            TEMP[i][j][k] = (preTEMP[i][j][k] * scale_factor_TEMP[0])
+            TEMP[rec][i][j][k] = (preTEMP[i][j][k] * scale_factor_TEMP[0])
               + add_offset_TEMP[0];
           else
-            TEMP[i][j][k] = no_val_TEMP[0];
+            TEMP[rec][i][j][k] = no_val_TEMP[0];
 
           if (preSALT[i][j][k] != no_val_SALT[0])
-            SALT[i][j][k] = (preSALT[i][j][k] * scale_factor_SALT[0])
+            SALT[rec][i][j][k] = (preSALT[i][j][k] * scale_factor_SALT[0])
               + add_offset_SALT[0];
           else
-            SALT[i][j][k] = no_val_SALT[0];
+            SALT[rec][i][j][k] = no_val_SALT[0];
           
-          cout << "SALT[" << i << "][" << j << "][" << k << "] = "
-               <<  SALT[i][j][k] << " psu" << endl;
+          cout << "SALT[" << rec << "][" << i << "][" << j << "][" << k << "] = "
+               <<  SALT[rec][i][j][k] << " psu" << endl;
 
-          cout << "TEMP[" << i << "][" << j << "][" << k << "] = "
-               << TEMP[i][j][k] << " degC" << endl;
+          cout << "TEMP[" << rec << "][" << i << "][" << j << "][" << k << "] = "
+               << TEMP[rec][i][j][k] << " degC" << endl;
+          }
         }
+      }
+    }
 
 
     //---------------------------------------------------------------
@@ -303,9 +477,9 @@ int main(void){
     cout << "* NETCDF DATA READ SUCCESSFUL! *\n";
     cout << "--------------------------------\n";
     cout << "ARRAYS CREATED:\n";
-    cout << "  SALT[" << depth_size << "]["
+    cout << "  SALT[" << ntime << "][" << depth_ind_range << "]["
          << lat_ind_range << "][" << lon_ind_range << "]\n";
-    cout << "  TEMP[" << depth_size << "]["
+    cout << "  TEMP[" << ntime << "][" << depth_ind_range << "]["
          << lat_ind_range << "][" << lon_ind_range << "]\n";
     cout << endl;
     return 0;
