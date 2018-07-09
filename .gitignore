@@ -30,3 +30,14 @@
 *.exe
 *.out
 *.app
+
+# Ignore DS_Store files:
+*.DS_Store
+
+# Ignore all temporary/buffer/autosave files:
+*~
+\#*
+
+# NetCDF files
+data/**
+*.nc
