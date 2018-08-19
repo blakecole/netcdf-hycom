@@ -719,8 +719,8 @@ int main(int argc, char **argv){
     saltVarOut.putAtt("units", SALT_UNITS);
     saltVarOut.putAtt("Fill_Value", ncShort, -30000);
     saltVarOut.putAtt("missing_value", ncShort, -30000);
-    saltVarOut.putAtt("scale_factor", ncFloat, 0.001);
-    saltVarOut.putAtt("add_offset", ncFloat, 20);
+    saltVarOut.putAtt("scale_factor", ncFloat, 1.0);
+    saltVarOut.putAtt("add_offset", ncFloat, 0);
     saltVarOut.putAtt("NAVO_code", ncInt, 16);
 
     // Temperature:
@@ -730,8 +730,8 @@ int main(int argc, char **argv){
     tempVarOut.putAtt("units", TEMP_UNITS);
     tempVarOut.putAtt("Fill_Value", ncShort, -30000);
     tempVarOut.putAtt("missing_value", ncShort, -30000);
-    tempVarOut.putAtt("scale_factor", ncFloat, 0.001);
-    tempVarOut.putAtt("add_offset", ncFloat, 20);
+    tempVarOut.putAtt("scale_factor", ncFloat, 1.0);
+    tempVarOut.putAtt("add_offset", ncFloat, 0);
     tempVarOut.putAtt("NAVO_code", ncInt, 15);
     tempVarOut.putAtt("comment", "in-situ temperature");
 
