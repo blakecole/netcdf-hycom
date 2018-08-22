@@ -27,6 +27,7 @@
 *.lib
 
 # Executables
+bin/**
 *.exe
 *.out
 *.app
@@ -39,4 +40,8 @@
 \#*
 
 # NetCDF files
+data/**
 *.nc
+
+# Keep .gitignore files
+!.gitignore
