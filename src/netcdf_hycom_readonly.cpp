@@ -113,8 +113,8 @@ int main(int argc, char **argv){
 
     //---------------------------------------------------------------
     // 4.2: Initialize 3D arrays
-    float preSALT[depth_size][lat_size][lon_size];
-    float preTEMP[depth_size][lat_size][lon_size];
+    short int preSALT[depth_size][lat_size][lon_size];
+    short int preTEMP[depth_size][lat_size][lon_size];
     float SALT[time_size][depth_size][lat_size][lon_size];
     float TEMP[time_size][depth_size][lat_size][lon_size];
 
@@ -145,7 +145,41 @@ int main(int argc, char **argv){
     }
 
     //---------------------------------------------------------------
-    // 4.4:[REMOVED] NO NEED FOR 'SCALE_FACTOR','ADD_OFFSET' [REMOVED]
+    // 4.4 Determine offset & scale factor from variable attributes
+    NcVarAtt scaleAtt, offsetAtt, missingAtt;
+    float scale_factor_SALT[1], add_offset_SALT[1], no_val_SALT[1];
+    float scale_factor_TEMP[1], add_offset_TEMP[1], no_val_TEMP[1];
+
+    // Temperature:
+    scaleAtt = tempVar.getAtt("scale_factor");
+    if (scaleAtt.isNull()) return NC_ERR;
+    scaleAtt.getValues(scale_factor_TEMP);
+
+    offsetAtt = tempVar.getAtt("add_offset");
+    if (offsetAtt.isNull()) return NC_ERR;
+    offsetAtt.getValues(add_offset_TEMP);
+
+    missingAtt = tempVar.getAtt("missing_value");
+    if (missingAtt.isNull()) return NC_ERR;
+    missingAtt.getValues(no_val_TEMP);
+
+    // Salinity:
+    scaleAtt = saltVar.getAtt("scale_factor");
+    if (scaleAtt.isNull()) return NC_ERR;
+    scaleAtt.getValues(scale_factor_SALT);
+
+    offsetAtt = saltVar.getAtt("add_offset");
+    if (offsetAtt.isNull()) return NC_ERR;
+    offsetAtt.getValues(add_offset_SALT);
+
+    missingAtt = saltVar.getAtt("missing_value");
+    if (missingAtt.isNull()) return NC_ERR;
+    missingAtt.getValues(no_val_SALT);
+
+    cout << "Temperature Scale, Offset = "
+         << scale_factor_TEMP[0] << "," << add_offset_TEMP[0] << endl;
+    cout << "Salinity Scale, Offset = "
+         << scale_factor_SALT[0] << "," << add_offset_SALT[0] << endl;
 
     //---------------------------------------------------------------
     // 4.5: Fill data arrays, multiply by scale factor, add offset
@@ -155,11 +189,22 @@ int main(int argc, char **argv){
       cout << "countp[0] = " << countp[0] << endl;
       saltVar.getVar(startp,countp,preSALT);
       tempVar.getVar(startp,countp,preTEMP);
+      
       for (int i=0; i<depth_size; i++){
         for (int j=0; j<lat_size; j++){
           for (int k=0; k<lon_size; k++){
-            TEMP[rec][i][j][k] = preTEMP[i][j][k];
-            SALT[rec][i][j][k] = preSALT[i][j][k];
+
+          if (preTEMP[i][j][k] != no_val_TEMP[0])
+            TEMP[rec][i][j][k] = (preTEMP[i][j][k] * scale_factor_TEMP[0])
+              + add_offset_TEMP[0];
+          else
+            TEMP[rec][i][j][k] = no_val_TEMP[0];
+
+          if (preSALT[i][j][k] != no_val_SALT[0])
+            SALT[rec][i][j][k] = (preSALT[i][j][k] * scale_factor_SALT[0])
+              + add_offset_SALT[0];
+          else
+            SALT[rec][i][j][k] = no_val_SALT[0];
           
           cout << "SALT[" << rec << "]["
                << i << "][" << j << "][" << k << "] = "

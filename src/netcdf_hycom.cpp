@@ -621,6 +621,12 @@ int main(int argc, char **argv){
     string SALT_UNITS  = saltUnits;
     string TEMP_UNITS  = tempUnits;
 
+    //---------------------------------------------------------------
+    // 6.0.4: Define variable scale and offsets
+    float ADD_OFFSET = 20;
+    float SCALE_FACTOR = 0.001;
+    short NO_VALUE = -30000;
+
     cout << "-> Constants defined." << endl;
     
     //---------------------------------------------------------------
@@ -658,8 +664,8 @@ int main(int argc, char **argv){
     dimVector.push_back(latDimOut);
     dimVector.push_back(lonDimOut);
 
-    NcVar saltVarOut = subsample.addVar(SALT_NAME, ncFloat, dimVector);
-    NcVar tempVarOut = subsample.addVar(TEMP_NAME, ncFloat, dimVector);
+    NcVar saltVarOut = subsample.addVar(SALT_NAME, ncShort, dimVector);
+    NcVar tempVarOut = subsample.addVar(TEMP_NAME, ncShort, dimVector);
 
     cout << "-> Data variables allocated." << endl;
 
@@ -717,10 +723,10 @@ int main(int argc, char **argv){
     saltVarOut.putAtt("long_name", "Salinity");
     saltVarOut.putAtt("standard_name", "sea_water_salinity");
     saltVarOut.putAtt("units", SALT_UNITS);
-    saltVarOut.putAtt("Fill_Value", ncShort, -30000);
-    saltVarOut.putAtt("missing_value", ncShort, -30000);
-    saltVarOut.putAtt("scale_factor", ncFloat, 1.0);
-    saltVarOut.putAtt("add_offset", ncFloat, 0);
+    saltVarOut.putAtt("Fill_Value", ncShort, NO_VALUE);
+    saltVarOut.putAtt("missing_value", ncShort, NO_VALUE);
+    saltVarOut.putAtt("scale_factor", ncFloat, SCALE_FACTOR);
+    saltVarOut.putAtt("add_offset", ncFloat, ADD_OFFSET);
     saltVarOut.putAtt("NAVO_code", ncInt, 16);
 
     // Temperature:
@@ -728,10 +734,10 @@ int main(int argc, char **argv){
     tempVarOut.putAtt("long_name", "Water Temperature");
     tempVarOut.putAtt("standard_name", "sea_water_temperature");
     tempVarOut.putAtt("units", TEMP_UNITS);
-    tempVarOut.putAtt("Fill_Value", ncShort, -30000);
-    tempVarOut.putAtt("missing_value", ncShort, -30000);
-    tempVarOut.putAtt("scale_factor", ncFloat, 1.0);
-    tempVarOut.putAtt("add_offset", ncFloat, 0);
+    tempVarOut.putAtt("Fill_Value", ncShort, NO_VALUE);
+    tempVarOut.putAtt("missing_value", ncShort, NO_VALUE);
+    tempVarOut.putAtt("scale_factor", ncFloat, SCALE_FACTOR);
+    tempVarOut.putAtt("add_offset", ncFloat, ADD_OFFSET);
     tempVarOut.putAtt("NAVO_code", ncInt, 15);
     tempVarOut.putAtt("comment", "in-situ temperature");
 
@@ -763,20 +769,44 @@ int main(int argc, char **argv){
 
     //---------------------------------------------------------------
     // 6.4.1: Fill data (dependent) VARIABLES
+    short shortSALT[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
+    short shortTEMP[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
+    
     vector<size_t> startp_write, countp_write;
     startp_write.push_back(0);
     startp_write.push_back(0);
     startp_write.push_back(0);
     startp_write.push_back(0);
-    countp_write.push_back(TIME_SIZE);
+    countp_write.push_back(1);
     countp_write.push_back(DEPTH_SIZE);
     countp_write.push_back(LAT_SIZE);
     countp_write.push_back(LON_SIZE);
 
-    //for (int rec=0; rec<ntime; rec++){
-    //startp_write[0] = rec;
-    saltVarOut.putVar(startp_write,countp_write,SALT);
-    tempVarOut.putVar(startp_write,countp_write,TEMP);
+    for (int rec=0; rec<ntime; rec++){
+      startp_write[0] = rec;
+
+      for (int i=0; i<depth_ind_range; i++){
+        for (int j=0; j<lat_ind_range; j++){
+          for (int k=0; k<lon_ind_range; k++){
+
+            if (TEMP[rec][i][j][k] != NO_VALUE)
+              shortTEMP[rec][i][j][k] = (TEMP[rec][i][j][k]-ADD_OFFSET)
+                /SCALE_FACTOR;
+            else
+              shortTEMP[rec][i][j][k] = NO_VALUE;
+
+            if (SALT[rec][i][j][k] != NO_VALUE)
+              shortSALT[rec][i][j][k] = (SALT[rec][i][j][k]-ADD_OFFSET)
+                /SCALE_FACTOR;
+            else
+              shortSALT[rec][i][j][k] = NO_VALUE;
+          }
+        }
+      }
+
+      saltVarOut.putVar(startp_write,countp_write,shortSALT);
+      tempVarOut.putVar(startp_write,countp_write,shortTEMP);
+    }
 
     cout << "-> Data variables written." << endl;
 

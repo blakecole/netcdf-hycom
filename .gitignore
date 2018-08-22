@@ -39,5 +39,4 @@
 \#*
 
 # NetCDF files
-data/**
 *.nc
