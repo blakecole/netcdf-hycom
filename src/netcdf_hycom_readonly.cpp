@@ -22,7 +22,8 @@ int main(int argc, char **argv){
     // 1. OPEN NETCDF FILE
     //---------------------------------------------------------------
     string NETCDF_DIR = "../data/salt_temp_4D.nc";
-    NcFile dataFile(NETCDF_DIR, NcFile::read, NcFile::nc4);
+    //NcFile dataFile(NETCDF_DIR, NcFile::read, NcFile::nc4);
+    NcFile dataFile(NETCDF_DIR, NcFile::read);
 
     //---------------------------------------------------------------
     // 2. INSPECT NETCDF FILE

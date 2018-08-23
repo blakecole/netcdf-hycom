@@ -52,7 +52,8 @@ int main(int argc, char **argv){
     // 1. OPEN NETCDF FILE
     //---------------------------------------------------------------
     string dataURL = "http://tds.hycom.org/thredds/dodsC/GLBv0.08/expt_93.0";
-    NcFile dataFile(dataURL, NcFile::read, NcFile::classic);
+    //NcFile dataFile(dataURL, NcFile::read, NcFile::classic);
+    NcFile dataFile(dataURL, NcFile::read);
 
     //---------------------------------------------------------------
     // 2. INSPECT NETCDF FILE
