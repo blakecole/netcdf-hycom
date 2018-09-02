@@ -9,6 +9,10 @@ If desired, the user can request that a new NetCDF file be created, representing
 
 --
 
+[User Manual PDF](./netcdf_hycom_readme.pdf "User Manual PDF")
+
+--
+
 Compiling on MacOSX:
 
 1. Use MacPorts to install the NetCDF Libraries for C++.
