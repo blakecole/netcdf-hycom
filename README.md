@@ -56,4 +56,4 @@ Compiling on Ubuntu-Linux:
                 $ g++ -o ../bin/netcdf_hycom_readonly netcdf_hycom_readonly.cpp -Wall -I/usr/include -L/usr/lib/x86_64-linux-gnu -lnetcdf_c++4
 
 
-
+This work is licensed under the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License. To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-nd/4.0/.
