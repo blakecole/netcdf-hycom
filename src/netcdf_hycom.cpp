@@ -51,7 +51,8 @@ int main(int argc, char **argv){
     //---------------------------------------------------------------
     // 1. OPEN NETCDF FILE
     //---------------------------------------------------------------
-    string dataURL = "http://tds.hycom.org/thredds/dodsC/GLBv0.08/expt_93.0";
+    //string dataURL = "http://tds.hycom.org/thredds/dodsC/GLBv0.08/expt_93.0";
+    string dataURL = "http://tds.hycom.org/thredds/dodsC/GLBv0.08/expt_92.9";
     //NcFile dataFile(dataURL, NcFile::read, NcFile::classic);
     NcFile dataFile(dataURL, NcFile::read);
 
@@ -475,6 +476,10 @@ int main(int argc, char **argv){
       cout << "countp[0] = " << countp[0] << endl;
       saltVar.getVar(startp,countp,preSALT);
       tempVar.getVar(startp,countp,preTEMP);
+
+      int time_ind = startp[0];
+      cout << "\n TIME STAMP: " << TIME[time_ind]
+           << " hours since 2000-01-01 00:00:00 \n" << endl;
       
       for (int i=0; i<depth_ind_range; i++){
         for (int j=0; j<lat_ind_range; j++){
@@ -632,7 +637,8 @@ int main(int argc, char **argv){
     
     //---------------------------------------------------------------
     // 6.1: Create NETCDF FILE
-    NcFile subsample(FILE_NAME, NcFile::replace, NcFile::nc4);
+    //NcFile subsample(FILE_NAME, NcFile::replace, NcFile::nc4);
+    NcFile subsample(FILE_NAME, NcFile::replace);
 
     if(subsample.isNull())
       return NC_ERR;
