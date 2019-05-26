@@ -1,4 +1,12 @@
 # netcdf_hycom
+
+/************************************************************/
+/*    NAME: Blake Cole                                      */
+/*    ORGN: MIT                                             */
+/*    FILE: README.md                                       */
+/*    DATE: 26 MAY 2019                                     */
+/************************************************************/
+
 C++ NetCDF Interface for the HYCOM Global Ocean Model
 
 This program is designed to extract 4D oceanographic data from the most recent HYCOM [https://hycom.org/] hindcast (GOFS 3.1: 41-layer HYCOM + NCODA Global 1/12° Analysis).
@@ -61,3 +69,25 @@ Compiling on Ubuntu-Linux:
 
 
 This work is licensed under the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License. To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-nd/4.0/.
+
+
+--
+
+Important Usage / Release Notes -- 26 MAY 2019:
+
+1. If specifying a date range from the command line, using '--tstart=' and '--tstop=', it is CRUCIAL that the correct format be used: [YYYY:MM:DD] (brackets included).
+   e.g. '--tstart=[2019:05:26] --tstop=[2019:05:27]'
+   Any and all other formats, or the accidental exclusion of brackets, will cause the program will fail.
+
+2. It is not currently possible to specify start/stop 'hours' via the command line switches.
+   If this level of precision is required, simply run the program without command line switches, and enter the data when prompted by the program.
+
+3. Command line switches are IN NO WAY 'quality-controlled' by the program; it is assumed that the user is providing appropriate values.
+   Inappropriate inputs will cause the program to fail.
+
+4. If an insufficient number of command line switches are detected, the user will be prompted to enter each spatio-temporal boundary parameter individually.
+   These inputs ARE 'quality-controlled'; the program will continue to query the user until a valid entry is detected.
+   This is honestly the safest and best way to input the 4D bounding box parameters; the command line switches are simply a useful tool if running many queries repeatedly.
+
+5. HYCOM model data is partitioned into one-year chunks, and stored in corresponding directories.
+   Accordingly, if earlier (pre-2018/2019) data is required, one must edit the field 'dataURL' (line 68) of netcdf_hycom.cpp to reference the appropriate directory.

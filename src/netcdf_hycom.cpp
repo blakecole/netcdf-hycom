@@ -2,16 +2,34 @@
 /*    NAME: Blake Cole                                      */
 /*    ORGN: MIT                                             */
 /*    FILE: netcdf_hycom.cpp                                */
-/*    DATE: 6 JULY 2018                                     */
+/*    DATE: 26 MAY 2019                                     */
 /************************************************************/
 
 #include <iostream>
 #include <cstdlib>
 #include <string>
+#include <sstream>
 #include <netcdf>
+
 using namespace std;
 using namespace netCDF;
 using namespace netCDF::exceptions;
+
+// LEAP YEAR CALCULATOR DECLARATIONS-----------------------
+struct date{
+  unsigned int y, m, d;
+};
+
+const int monthDays[12] = {31, 28, 31, 30, 31, 30,
+                           31, 31, 30, 31, 30, 31};
+unsigned int years;
+unsigned long int n1, n2, hours;
+
+// Declare functions (defined at bottom):
+int countLeapYears(date d);
+int getDifference(date date1, date date2);
+
+//----------------------------------------------------------
 
 // Return this code to the OS in case of failure.
 static const int NC_ERR = 2;
@@ -27,12 +45,8 @@ int main(int argc, char **argv){
            <<"           (1) Extract from local NetCDF file\n"
            <<"           (2) Extract directly from HYCOM online database.";
       cout <<"\n\n  USAGE: " << argv[0] << " [command line switches]\n"
-           <<"  --time=current    : time: most recent data record only\n"
-           <<"  --hours=[INT]     : time: block of hours to now\n"
-           <<"  --days=[INT]      : time: block of days to now\n"
-           <<"  --weeks=[INT]      : time: block of weeks to now\n"
-           <<"  --tmin=[INT]       : time: start time, hours from now\n"
-           <<"  --tmax=[INT]       : time: end time, hours from now\n"
+           <<"  --tstart=[STRING]  : time: start time, [year:month:day]\n"
+           <<"  --tstop=[STRING]   : time: end time, [year:month:day]\n"
            <<"  --depthmin=[FLOAT] : depth: shallowest depth\n"
            <<"  --depthmax=[FLOAT] : depth: deepest depth\n"
            <<"  --latmin=[FLOAT]   : latitude: southern edge\n"
@@ -51,8 +65,8 @@ int main(int argc, char **argv){
     //---------------------------------------------------------------
     // 1. OPEN NETCDF FILE
     //---------------------------------------------------------------
-    //string dataURL = "http://tds.hycom.org/thredds/dodsC/GLBv0.08/expt_93.0";
-    string dataURL = "http://tds.hycom.org/thredds/dodsC/GLBv0.08/expt_92.9";
+    string dataURL = "http://tds.hycom.org/thredds/dodsC/GLBv0.08/expt_93.0";
+    //string dataURL = "http://tds.hycom.org/thredds/dodsC/GLBv0.08/expt_92.9";
     //NcFile dataFile(dataURL, NcFile::read, NcFile::classic);
     NcFile dataFile(dataURL, NcFile::read);
 
@@ -142,7 +156,10 @@ int main(int argc, char **argv){
     
     //---------------------------------------------------------------
     // 4.1.1: Read spatial/temporal range from command line
-    int tau_min, tau_max;
+    int y1, m1, d1, h1=0;
+    int y2, m2, d2, h2=0;
+    date ref_date = {2000,1,1}; //HYCOM reference date
+    int tstart, tstop;
     float depth_min, depth_max;
     float lat_min, lat_max;
     float lon_min, lon_max;
@@ -150,40 +167,28 @@ int main(int argc, char **argv){
     string newfile_response = "";
     int nparams = 0;
     for (int i=1; i<argc; i++){
-      string input;
+      string input, subinput;
       string argi = argv[i];
       cout << "argv[" << i << "] = " << argi << endl;
-      if(argi.find("--time=current") == 0){
-        tau_min = 0;
-        tau_max = 0;
-        nparams+=2;
-      }
-      else if(argi.find("--hours=") == 0){
-        input = argi.substr(8);
-        tau_min = 0;
-        tau_max = atoi(input.c_str());
-        nparams+=2;
-      }
-      else if(argi.find("--days=") == 0){
-        input = argi.substr(7);
-        tau_min = 0;
-        tau_max = atoi(input.c_str())*24 - 1;
-        nparams+=2;
-      }
-      else if(argi.find("--weeks=") == 0){
-        input = argi.substr(8);
-        tau_min = 0;
-        tau_max = atoi(input.c_str())*24*7 - 1;
-        nparams+=2;
-      }
-      else if(argi.find("--tmin=") == 0){
-        input = argi.substr(7);
-        tau_min = atoi(input.c_str());
+      
+      if(argi.find("--tstart=") == 0){
+        input = argi.substr(9); //entire string token
+        subinput = input.substr(1,4); //grab year
+        y1 = atoi(subinput.c_str());  //convert to int
+        subinput = input.substr(6,2); //grab month
+        m1 = atoi(subinput.c_str());  //convert to int
+        subinput = input.substr(9,2); //grab day
+        d1 = atoi(subinput.c_str());  //convert to int
         nparams++;
       }
-      else if(argi.find("--tmax=") == 0){
-        input = argi.substr(7);
-        tau_max = atof(input.c_str());
+      else if(argi.find("--tstop=") == 0){
+        input = argi.substr(8); //entire string token
+        subinput = input.substr(1,4); //grab year
+        y2 = atoi(subinput.c_str());  //convert to int
+        subinput = input.substr(6,2); //grab month
+        m2 = atoi(subinput.c_str());  //convert to int
+        subinput = input.substr(9,2); //grab day
+        d2 = atoi(subinput.c_str());  //convert to int
         nparams++;
       }
       else if(argi.find("--depthmin=") == 0){
@@ -226,119 +231,193 @@ int main(int argc, char **argv){
 
     //4.1.2: If command line fails, manually input bounds
     if (nparams != 8){
+      string input;
       cout << "\n(!)   ERROR: EXACTLY (8) PARAMETERS REQUIRED.   (!)\n"
            << "(!)                  "
            << "(" << nparams << ") PARAMETERS PROVIDED.   (!)\n"
            << "(!) PLEASE MANUALLY DEFINE SUBSET BOUNDS BELOW. (!)\n"
            << endl;
-      
-      cout << "  1. Time Start [hours since analysis]"
-           << " [0:" << time_size-1 << "]: ";
-      cin >> tau_max;
 
-      while ((tau_max > time_size-1)||(tau_max < 0)){
-        cout << "  (!) WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. "
-             << "TRY AGAIN. (!)\n\n"
-             << "  1. Time Start [hours since analysis]"
-             << " [0:" << time_size-1 << "]: ";
-        cin >> tau_max;
-      }
-        
-      cout << "  2. Time Stop [hours since analysis]"
-           << " [0:" << time_size-1 << "]: ";
-      cin >> tau_min;
-      
-      while ((tau_min > time_size-1)||(tau_min < 0)){
-        cout << "  (!) WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. "
-             << "TRY AGAIN. (!)\n\n"
-             << "  2. Time Stop [hours since analysis]"
-             << " [0:" << time_size-1 << "]: ";
-        cin >> tau_min;
+      // RECORD START DATE/TIME----------------------------
+      while (true){
+        cout << "  1A. Start Year [YYYY]: ";
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> y1){
+          if (y1 >= 0)
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
       }
 
-      while (tau_min > tau_max){
-        cout << "  (!) WARNING: 'Time Start' MUST EXCEED 'Time Stop'.\n\n"
-             << "  Time Start [hours since analysis]"
-             << " [0:" << time_size-1 << "]: ";
-        cin >> tau_max;
-        
-        cout << "  Time Stop [hours since analysis]"
-             << " [0:" << time_size-1 << "]: ";
-        cin >> tau_min;
+      while (true){
+        cout << "  1B. Start Month [MM]: ";
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> m1){
+          if ((m1 >= 1)&&(m1 <= 12))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
       }
 
-      cout << "  3. Minimum Depth [meters] [" << DEPTH[0]
-           << ":" << DEPTH[depth_size-1] << "]: ";
-      cin >> depth_min;
-      
-      while ((depth_min < DEPTH[0])||(depth_min > DEPTH[depth_size-1])){
-        cout << "  (!) WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. "
-             << "TRY AGAIN. (!)\n\n"
-             << "  3. Minimum Depth [meters] [" << DEPTH[0]
+      while (true){
+        cout << "  1C. Start Day [DD]: ";
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> d1){
+          if ((d1 >= 1)&&(d1 <= 31))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
+      }
+
+      while (true){
+        cout << "  1D. Start Hour [0:23]: ";
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> h1){
+          if ((h1 >= 0)&&(h1 < 24))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
+      }
+
+      // RECORD STOP DATE/TIME----------------------------
+      while (true){
+        cout << "  2A. Stop Year [YYYY]: ";
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> y2){
+          if (y2 >= 0)
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
+      }
+
+      while (true){
+        cout << "  2B. Stop Month [MM]: ";
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> m2){
+          if ((m2 >= 1)&&(m2 <= 12))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
+      }
+
+      while (true){
+        cout << "  2C. Stop Day [DD]: ";
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> d2){
+          if ((d2 >= 1)&&(d2 <= 31))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
+      }
+
+      while (true){
+        cout << "  2D. Stop Hour [0:23]: ";
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> h2){
+          if ((h2 >= 0)&&(h2 < 24))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
+      }
+
+      // DEPTH RANGE--------------------------------------
+      while (true){
+        cout << "  3. Minimum Depth [meters] [" << DEPTH[0]
              << ":" << DEPTH[depth_size-1] << "]: ";
-        cin >> depth_min;
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> depth_min){
+          if((depth_min >= DEPTH[0])&&(depth_min <= DEPTH[depth_size-1]))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
       }
-      
-      cout << "  4. Maximum Depth [meters] [" << DEPTH[0]
-           << ":" << DEPTH[depth_size-1] << "]: ";
-      cin >> depth_max;
-      
-      while ((depth_max < DEPTH[0])||(depth_max > DEPTH[depth_size-1])){
-        cout << "  (!) WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. "
-             << "TRY AGAIN. (!)\n\n"
-             << "  4. Maximum Depth [meters] [" << DEPTH[0]
+
+      while (true){
+        cout << "  4. Maximum Depth [meters] [" << DEPTH[0]
              << ":" << DEPTH[depth_size-1] << "]: ";
-        cin >> depth_max;
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> depth_max){
+          if((depth_max >= DEPTH[0])&&(depth_max <= DEPTH[depth_size-1]))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
       }
 
-      cout << "  5. Minimum Latitude [degrees] [" << LAT[0]
-           << ":" << LAT[lat_size-1] << "]: ";
-      cin >> lat_min;
-      
-      while ((lat_min < LAT[0])||(lat_min > LAT[lat_size-1])){
-        cout << "  (!) WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. "
-             << "TRY AGAIN. (!)\n\n"
-             << "  5. Minimum Latitude [degrees] [" << LAT[0]
+      // LATITUDE RANGE-----------------------------------
+      while (true){
+        cout << "  5. Minimum Latitude [degrees] [" << LAT[0]
              << ":" << LAT[lat_size-1] << "]: ";
-        cin >> lat_min;
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> lat_min){
+          if((lat_min >= LAT[0])&&(lat_min <= LAT[lat_size-1]))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
       }
 
-      cout << "  6. Maximum Latitude [degrees] [" << LAT[0]
-           << ":" << LAT[lat_size-1] << "]: ";
-      cin >> lat_max;
-      
-      while ((lat_max < LAT[0])||(lat_max > LAT[lat_size-1])){
-        cout << "  (!) WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. "
-             << "TRY AGAIN. (!)\n\n"
-             << "  6. Maximum Latitude [degrees] [" << LAT[0]
+      while (true){
+        cout << "  6. Maximum Latitude [degrees] [" << LAT[0]
              << ":" << LAT[lat_size-1] << "]: ";
-        cin >> lat_max;
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> lat_max){
+          if((lat_max >= LAT[0])&&(lat_max <= LAT[lat_size-1]))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
       }
-        
-      cout << "  7. Minimum Longitude [degrees] [" << LON[0]
+
+      // LONGITUDE RANGE-----------------------------------
+      while (true){
+        cout << "  7. Minimum Longitude [degrees] [" << LON[0]
            << ":" << LON[lon_size-1] << "]: ";
-      cin >> lon_min;
-      
-      while ((lon_min < LON[0])||(lon_min > LON[lon_size-1])){
-        cout << "  (!) WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. "
-             << "TRY AGAIN. (!)\n\n"
-             << "  7. Minimum Longitude [degrees] [" << LON[0]
-             << ":" << LON[lon_size-1] << "]: ";
-        cin >> lon_min;
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> lon_min){
+          if((lon_min >= LON[0])&&(lon_min <= LON[lon_size-1]))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
       }
-        
-      cout << "  8. Maximum Longitude [degrees] [" << LON[0]
-           << ":" << LON[lon_size-1] << "]: ";
-      cin >> lon_max;
-      
-      while ((lon_max < LON[0])||(lon_max > LON[lon_size-1])){
-        cout << "  (!) WARNING: VALUE MUST BE WITHIN ACCEPTABLE RANGE. "
-             << "TRY AGAIN. (!)\n\n";
+
+      while (true){
         cout << "  8. Maximum Longitude [degrees] [" << LON[0]
              << ":" << LON[lon_size-1] << "]: ";
-        cin >> lon_max;
+        getline(cin, input);
+        stringstream ss;
+        ss.str(input);
+        if (ss >> lon_max){
+          if((lon_max >= LON[0])&&(lon_max <= LON[lon_size-1]))
+            break;
+        }
+        cout << "INVALID ENTRY, please try again" << endl;
       }
 
+      // NEW NET CDF FILE DESIRED? -------------------------
       cout << "\n  WOULD YOU LIKE TO CREATE A NEW NETCDF FILE? [Y/n]: ";
       cin >> newfile_response;
 
@@ -349,10 +428,19 @@ int main(int argc, char **argv){
       else if ((newfile_response=="N")  ||(newfile_response=="NO")
           ||(newfile_response=="n")||(newfile_response=="no")){
         newfile = false;
-      } 
+      }
     }
 
-    // 4.1.3: Search for closest HYCOM values
+    // 4.1.3: Convert YYYY/MM/DD HH to hours since 2000/1/1 00:00:00
+    date date1 = {y1,m1,d1};
+    tstart = getDifference(ref_date, date1);
+    tstart += h1; // add hours
+
+    date date2 = {y2,m2,d2};
+    tstop = getDifference(ref_date, date2);
+    tstop += h2; // add hours
+
+    // 4.1.4: Search for closest HYCOM values
     int depth_ind_high=0;
     while (DEPTH[depth_ind_high] < depth_max)
       depth_ind_high++;
@@ -374,12 +462,21 @@ int main(int argc, char **argv){
     while (LON[lon_ind_low] < lon_min)
       lon_ind_low++;
 
+    int time_ind_high=0;
+    while (TIME[time_ind_high] < tstop)
+      time_ind_high++;
+    int time_ind_low=0;
+    while (TIME[time_ind_low] <= tstart)
+      time_ind_low++;
+    time_ind_low--; // one timestep back for inclusive range
+
     cout << "-----------------------\n";
     cout << "SPATIAL RANGE:" << endl;
     cout << "Requested:\n";
     cout << "  DEPTH = " << depth_min << ":" << depth_max << "\n";
     cout << "  LAT   = " << lat_min << ":" << lat_max << "\n";
     cout << "  LON   = " << lon_min << ":" << lon_max << "\n";
+    cout << "  TIME  = " << tstart  << ":" << tstop   << "\n";
     
     
     cout << "Actual:\n";
@@ -389,13 +486,15 @@ int main(int argc, char **argv){
          << LAT[lat_ind_low] << ":" << LAT[lat_ind_high] << "\n";
     cout << "  LON[" << lon_ind_low << ":" << lon_ind_high << "] = "
          << LON[lon_ind_low] << ":" << LON[lon_ind_high] << "\n";
+    cout << "  TIME[" << time_ind_low << ":" << time_ind_high << "] = "
+         << TIME[time_ind_low] << ":" << TIME[time_ind_high] << "\n";
     cout << endl;
 
     // Index Ranges (+1 for inclusive)
     int lat_ind_range = lat_ind_high - lat_ind_low +1;
     int lon_ind_range = lon_ind_high - lon_ind_low +1;
     int depth_ind_range = depth_ind_high - depth_ind_low +1;
-    int ntime = tau_max - tau_min + 1;
+    int ntime = time_ind_high - time_ind_low +1;
 
     //---------------------------------------------------------------
     // 4.2: Initialize 3D arrays
@@ -470,8 +569,13 @@ int main(int argc, char **argv){
 
     //---------------------------------------------------------------
     // 4.5: Fill data arrays, multiply by scale factor, add offset
+
+    // rather than using ntime, we need to:
+    // (1) determine nearest real index brackets for time vector
+    // (2) count number of intervening hourly timestamps
+    // (3) loop through each
     for (int rec=0; rec<ntime; rec++){
-      startp[0] = (time_size-1) - tau_max + rec;
+      startp[0] = (time_ind_low + rec);
       cout << "startp[0] = " << startp[0] << endl;
       cout << "countp[0] = " << countp[0] << endl;
       saltVar.getVar(startp,countp,preSALT);
@@ -757,7 +861,6 @@ int main(int argc, char **argv){
     float LAT_OUT[lat_ind_range];
     float LON_OUT[lon_ind_range];
 
-    int time_ind_low  = (time_size-1) - tau_max;
     for (int rec=0; rec<ntime; rec++)
       TIME_OUT[rec] = TIME[time_ind_low+rec];
     for (int i=0; i<depth_ind_range; i++)
@@ -833,4 +936,57 @@ int main(int argc, char **argv){
     cout << "*** [FAIL] ***" << endl;
     return NC_ERR;
   }
+}
+
+
+//---------------------------------------------------------------
+//---------------------------------------------------------------
+
+
+//---------------------------------------------------------------
+// HELPER FUNCTIONS
+//---------------------------------------------------------------
+// Find number of days between two given dates
+// Adapted from Abhay Rathi of www.geeksforgeeks.org
+
+// Count number of leap years before date d={yyyy, mm, dd}
+int countLeapYears(date d)
+{ 
+    years = d.y;
+    
+    // Check if the current year needs to be considered 
+    // for the count of leap years or not
+    if (d.m <= 2)
+        years--;
+    
+    // An year is a leap year if it is a multiple of 4,
+    // multiple of 400 and not a multiple of 100.
+    return (years/4) - (years/100) + (years/400);
+}
+
+// This function returns number of days between two dates 
+int getDifference(date date1, date date2)
+{
+  // COUNT TOTAL NUMBER OF DAYS BEFORE FIRST DATE 'date1' 
+  // initialize count using years and day
+  n1 = date1.y*365 + date1.d;
+
+  // Add days for months in given date
+  for (int i=0; i<(date1.m - 1); i++)
+    n1 += monthDays[i];
+
+  // Since every leap year is of 366 days,
+  // Add a day for every leap year
+  n1 += countLeapYears(date1);
+
+  // COUNT TOTAL NUMBER OF DAYS BEFORE 'date2'
+  n2 = date2.y*365 + date2.d;
+  for (int i=0; i<(date2.m - 1); i++)
+    n2 += monthDays[i];
+  n2 += countLeapYears(date2);
+
+  hours = 24*(n2-n1);
+
+  // return difference between two counts
+  return (hours);
 }
