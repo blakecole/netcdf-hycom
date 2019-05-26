@@ -17,7 +17,7 @@ using namespace netCDF::exceptions;
 
 // LEAP YEAR CALCULATOR DECLARATIONS-----------------------
 struct date{
-  unsigned int y, m, d;
+  int y, m, d;
 };
 
 const int monthDays[12] = {31, 28, 31, 30, 31, 30,
