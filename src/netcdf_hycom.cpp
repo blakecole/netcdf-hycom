@@ -10,6 +10,7 @@
 #include <string>
 #include <sstream>
 #include <netcdf>
+#include "boost/multi_array.hpp"
 
 using namespace std;
 using namespace netCDF;
@@ -500,8 +501,13 @@ int main(int argc, char **argv){
     // 4.2: Initialize 3D arrays
     short int preSALT[depth_ind_range][lat_ind_range][lon_ind_range];
     short int preTEMP[depth_ind_range][lat_ind_range][lon_ind_range];
-    float SALT[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
-    float TEMP[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
+    //float SALT[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
+    //float TEMP[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
+
+    typedef boost::multi_array<float, 4> array_float4D;
+    typedef array_float4D::index index;
+    array_float4D SALT(boost::extents[ntime][depth_ind_range][lat_ind_range][lon_ind_range]);
+    array_float4D TEMP(boost::extents[ntime][depth_ind_range][lat_ind_range][lon_ind_range]);
 
     NcVar saltVar, tempVar;
     saltVar = dataFile.getVar("salinity");
@@ -574,7 +580,7 @@ int main(int argc, char **argv){
     // (1) determine nearest real index brackets for time vector
     // (2) count number of intervening hourly timestamps
     // (3) loop through each
-    for (int rec=0; rec<ntime; rec++){
+    for (index rec=0; rec<ntime; rec++){
       startp[0] = (time_ind_low + rec);
       cout << "startp[0] = " << startp[0] << endl;
       cout << "countp[0] = " << countp[0] << endl;
@@ -585,9 +591,9 @@ int main(int argc, char **argv){
       cout << "\n TIME STAMP: " << TIME[time_ind]
            << " hours since 2000-01-01 00:00:00 \n" << endl;
       
-      for (int i=0; i<depth_ind_range; i++){
-        for (int j=0; j<lat_ind_range; j++){
-          for (int k=0; k<lon_ind_range; k++){
+      for (index i=0; i<depth_ind_range; i++){
+        for (index j=0; j<lat_ind_range; j++){
+          for (index k=0; k<lon_ind_range; k++){
 
           if (preTEMP[i][j][k] != no_val_TEMP[0])
             TEMP[rec][i][j][k] = (preTEMP[i][j][k] * scale_factor_TEMP[0])
@@ -879,8 +885,8 @@ int main(int argc, char **argv){
 
     //---------------------------------------------------------------
     // 6.4.1: Fill data (dependent) VARIABLES
-    short shortSALT[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
-    short shortTEMP[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
+    //short shortSALT[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
+    //short shortTEMP[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
     
     vector<size_t> startp_write, countp_write;
     startp_write.push_back(0);
@@ -895,21 +901,31 @@ int main(int argc, char **argv){
     for (int rec=0; rec<ntime; rec++){
       startp_write[0] = rec;
 
+      short shortSALT[depth_ind_range][lat_ind_range][lon_ind_range];
+      short shortTEMP[depth_ind_range][lat_ind_range][lon_ind_range];
+
       for (int i=0; i<depth_ind_range; i++){
         for (int j=0; j<lat_ind_range; j++){
           for (int k=0; k<lon_ind_range; k++){
 
             if (TEMP[rec][i][j][k] != NO_VALUE)
-              shortTEMP[rec][i][j][k] = (TEMP[rec][i][j][k]-ADD_OFFSET)
+              //shortTEMP[rec][i][j][k] = (TEMP[rec][i][j][k]-ADD_OFFSET)
+              //  /SCALE_FACTOR;
+              shortTEMP[i][j][k] = (TEMP[rec][i][j][k]-ADD_OFFSET)
                 /SCALE_FACTOR;
             else
-              shortTEMP[rec][i][j][k] = NO_VALUE;
+              //shortTEMP[rec][i][j][k] = NO_VALUE;
+              shortTEMP[i][j][k] = NO_VALUE;
 
             if (SALT[rec][i][j][k] != NO_VALUE)
-              shortSALT[rec][i][j][k] = (SALT[rec][i][j][k]-ADD_OFFSET)
+              //shortSALT[rec][i][j][k] = (SALT[rec][i][j][k]-ADD_OFFSET)
+              //  /SCALE_FACTOR;
+              shortSALT[i][j][k] = (SALT[rec][i][j][k]-ADD_OFFSET)
                 /SCALE_FACTOR;
             else
-              shortSALT[rec][i][j][k] = NO_VALUE;
+              //shortSALT[rec][i][j][k] = NO_VALUE;
+              shortSALT[i][j][k] = NO_VALUE;
+
           }
         }
       }

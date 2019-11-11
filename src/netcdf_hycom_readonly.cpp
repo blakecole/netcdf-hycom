@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <string>
 #include <netcdf>
+#include "boost/multi_array.hpp"
+
 using namespace std;
 using namespace netCDF;
 using namespace netCDF::exceptions;
@@ -116,9 +118,14 @@ int main(int argc, char **argv){
     // 4.2: Initialize 3D arrays
     short int preSALT[depth_size][lat_size][lon_size];
     short int preTEMP[depth_size][lat_size][lon_size];
-    float SALT[time_size][depth_size][lat_size][lon_size];
-    float TEMP[time_size][depth_size][lat_size][lon_size];
+    //float SALT[time_size][depth_size][lat_size][lon_size];
+    //float TEMP[time_size][depth_size][lat_size][lon_size];
 
+    typedef boost::multi_array<float, 4> array_float4D;
+    typedef array_float4D::index index;
+    array_float4D SALT(boost::extents[time_size][depth_size][lat_size][lon_size]);
+    array_float4D TEMP(boost::extents[time_size][depth_size][lat_size][lon_size]);
+    
     NcVar saltVar, tempVar;
     saltVar = dataFile.getVar("salinity");
     if(saltVar.isNull())
@@ -182,18 +189,19 @@ int main(int argc, char **argv){
     cout << "Salinity Scale, Offset = "
          << scale_factor_SALT[0] << "," << add_offset_SALT[0] << endl;
 
+    
     //---------------------------------------------------------------
     // 4.5: Fill data arrays, multiply by scale factor, add offset
-    for (int rec=0; rec<time_size; rec++){
+    for (index rec=0; rec<time_size; rec++){
       startp[0] = rec;
       cout << "startp[0] = " << startp[0] << endl;
       cout << "countp[0] = " << countp[0] << endl;
       saltVar.getVar(startp,countp,preSALT);
       tempVar.getVar(startp,countp,preTEMP);
       
-      for (int i=0; i<depth_size; i++){
-        for (int j=0; j<lat_size; j++){
-          for (int k=0; k<lon_size; k++){
+      for (index i=0; i<depth_size; i++){
+        for (index j=0; j<lat_size; j++){
+          for (index k=0; k<lon_size; k++){
 
           if (preTEMP[i][j][k] != no_val_TEMP[0])
             TEMP[rec][i][j][k] = (preTEMP[i][j][k] * scale_factor_TEMP[0])
