@@ -580,16 +580,18 @@ int main(int argc, char **argv){
     // (1) determine nearest real index brackets for time vector
     // (2) count number of intervening hourly timestamps
     // (3) loop through each
+    cout << "--------------------------------\n";
+    cout << "READING NETCDF DATA FILE... \n";
+    
     for (index rec=0; rec<ntime; rec++){
       startp[0] = (time_ind_low + rec);
-      cout << "startp[0] = " << startp[0] << endl;
-      cout << "countp[0] = " << countp[0] << endl;
       saltVar.getVar(startp,countp,preSALT);
       tempVar.getVar(startp,countp,preTEMP);
 
       int time_ind = startp[0];
-      cout << "\n TIME STAMP: " << TIME[time_ind]
-           << " hours since 2000-01-01 00:00:00 \n" << endl;
+      cout << "TIME STAMP: " << TIME[time_ind]
+           << " hours since 2000-01-01 00:00:00 "
+           << "[" << rec << "/" << ntime << "]" << endl;
       
       for (index i=0; i<depth_ind_range; i++){
         for (index j=0; j<lat_ind_range; j++){
@@ -606,14 +608,6 @@ int main(int argc, char **argv){
               + add_offset_SALT[0];
           else
             SALT[rec][i][j][k] = no_val_SALT[0];
-          
-          cout << "SALT[" << rec << "]["
-               << i << "][" << j << "][" << k << "] = "
-               <<  SALT[rec][i][j][k] << " psu" << endl;
-
-          cout << "TEMP[" << rec << "]["
-               << i << "][" << j << "][" << k << "] = "
-               << TEMP[rec][i][j][k] << " degC" << endl;
           }
         }
       }

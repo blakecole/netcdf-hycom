@@ -192,12 +192,18 @@ int main(int argc, char **argv){
     
     //---------------------------------------------------------------
     // 4.5: Fill data arrays, multiply by scale factor, add offset
+    cout << "--------------------------------\n";
+    cout << "READING NETCDF DATA FILE... \n";
+    
     for (index rec=0; rec<time_size; rec++){
       startp[0] = rec;
-      cout << "startp[0] = " << startp[0] << endl;
-      cout << "countp[0] = " << countp[0] << endl;
       saltVar.getVar(startp,countp,preSALT);
       tempVar.getVar(startp,countp,preTEMP);
+
+      int time_ind = startp[0];
+      cout << "TIME STAMP: " << TIME[time_ind]
+           << " hours since 2000-01-01 00:00:00 "
+           << "[" << rec << "/" << time_size << "]" << endl;
       
       for (index i=0; i<depth_size; i++){
         for (index j=0; j<lat_size; j++){
@@ -214,14 +220,6 @@ int main(int argc, char **argv){
               + add_offset_SALT[0];
           else
             SALT[rec][i][j][k] = no_val_SALT[0];
-          
-          cout << "SALT[" << rec << "]["
-               << i << "][" << j << "][" << k << "] = "
-               <<  SALT[rec][i][j][k] << " psu" << endl;
-
-          cout << "TEMP[" << rec << "]["
-               << i << "][" << j << "][" << k << "] = "
-               << TEMP[rec][i][j][k] << " degC" << endl;
           }
         }
       }
