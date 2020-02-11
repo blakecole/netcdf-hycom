@@ -1,8 +1,8 @@
 /************************************************************/
 /*    NAME: Blake Cole                                      */
 /*    ORGN: MIT                                             */
-/*    FILE: netcdf_hycom.cpp                                */
-/*    DATE: 26 MAY 2019                                     */
+/*    FILE: uv_hycom.cpp                                    */
+/*    DATE: 21 DEC 2019                                     */
 /************************************************************/
 
 #include <iostream>
@@ -501,23 +501,21 @@ int main(int argc, char **argv){
 
     //---------------------------------------------------------------
     // 4.2: Initialize 3D arrays
-    short int preSALT[depth_ind_range][lat_ind_range][lon_ind_range];
-    short int preTEMP[depth_ind_range][lat_ind_range][lon_ind_range];
-    //float SALT[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
-    //float TEMP[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
+    short int preU[depth_ind_range][lat_ind_range][lon_ind_range];
+    short int preV[depth_ind_range][lat_ind_range][lon_ind_range];
 
     typedef boost::multi_array<float, 4> array_float4D;
     typedef array_float4D::index index;
-    array_float4D SALT(boost::extents[ntime][depth_ind_range][lat_ind_range][lon_ind_range]);
-    array_float4D TEMP(boost::extents[ntime][depth_ind_range][lat_ind_range][lon_ind_range]);
+    array_float4D U(boost::extents[ntime][depth_ind_range][lat_ind_range][lon_ind_range]);
+    array_float4D V(boost::extents[ntime][depth_ind_range][lat_ind_range][lon_ind_range]);
 
-    NcVar saltVar, tempVar;
-    saltVar = dataFile.getVar("salinity");
-    if(saltVar.isNull())
+    NcVar uVar, vVar;
+    uVar = dataFile.getVar("water_u");
+    if(uVar.isNull())
       return NC_ERR;
 
-    tempVar = dataFile.getVar("water_temp");
-    if(tempVar.isNull())
+    vVar = dataFile.getVar("water_v");
+    if(vVar.isNull())
       return NC_ERR;
 
     //---------------------------------------------------------------
@@ -540,39 +538,39 @@ int main(int argc, char **argv){
     //---------------------------------------------------------------
     // 4.4 Determine offset & scale factor from variable attributes
     NcVarAtt scaleAtt, offsetAtt, missingAtt;
-    float scale_factor_SALT[1], add_offset_SALT[1], no_val_SALT[1];
-    float scale_factor_TEMP[1], add_offset_TEMP[1], no_val_TEMP[1];
+    float scale_factor_U[1], add_offset_U[1], no_val_U[1];
+    float scale_factor_V[1], add_offset_V[1], no_val_V[1];
 
-    // Temperature:
-    scaleAtt = tempVar.getAtt("scale_factor");
+    // Lateral Velocity Component (V):
+    scaleAtt = vVar.getAtt("scale_factor");
     if (scaleAtt.isNull()) return NC_ERR;
-    scaleAtt.getValues(scale_factor_TEMP);
+    scaleAtt.getValues(scale_factor_V);
 
-    offsetAtt = tempVar.getAtt("add_offset");
+    offsetAtt = vVar.getAtt("add_offset");
     if (offsetAtt.isNull()) return NC_ERR;
-    offsetAtt.getValues(add_offset_TEMP);
+    offsetAtt.getValues(add_offset_V);
 
-    missingAtt = tempVar.getAtt("missing_value");
+    missingAtt = vVar.getAtt("missing_value");
     if (missingAtt.isNull()) return NC_ERR;
-    missingAtt.getValues(no_val_TEMP);
+    missingAtt.getValues(no_val_V);
 
-    // Salinity:
-    scaleAtt = saltVar.getAtt("scale_factor");
+    // Longitudinal Velocity Component (U):
+    scaleAtt = uVar.getAtt("scale_factor");
     if (scaleAtt.isNull()) return NC_ERR;
-    scaleAtt.getValues(scale_factor_SALT);
+    scaleAtt.getValues(scale_factor_U);
 
-    offsetAtt = saltVar.getAtt("add_offset");
+    offsetAtt = uVar.getAtt("add_offset");
     if (offsetAtt.isNull()) return NC_ERR;
-    offsetAtt.getValues(add_offset_SALT);
+    offsetAtt.getValues(add_offset_U);
 
-    missingAtt = saltVar.getAtt("missing_value");
+    missingAtt = uVar.getAtt("missing_value");
     if (missingAtt.isNull()) return NC_ERR;
-    missingAtt.getValues(no_val_SALT);
+    missingAtt.getValues(no_val_U);
 
-    cout << "Temperature Scale, Offset = "
-         << scale_factor_TEMP[0] << "," << add_offset_TEMP[0] << endl;
-    cout << "Salinity Scale, Offset = "
-         << scale_factor_SALT[0] << "," << add_offset_SALT[0] << endl;
+    cout << "Velocity (V) Scale, Offset = "
+         << scale_factor_V[0] << "," << add_offset_V[0] << endl;
+    cout << "Velocity (U) Scale, Offset = "
+         << scale_factor_U[0] << "," << add_offset_U[0] << endl;
 
 
     //---------------------------------------------------------------
@@ -587,8 +585,8 @@ int main(int argc, char **argv){
     
     for (index rec=0; rec<ntime; rec++){
       startp[0] = (time_ind_low + rec);
-      saltVar.getVar(startp,countp,preSALT);
-      tempVar.getVar(startp,countp,preTEMP);
+      uVar.getVar(startp,countp,preU);
+      vVar.getVar(startp,countp,preV);
 
       int time_ind = startp[0];
       cout << "TIME STAMP: " << TIME[time_ind]
@@ -599,17 +597,17 @@ int main(int argc, char **argv){
         for (index j=0; j<lat_ind_range; j++){
           for (index k=0; k<lon_ind_range; k++){
 
-          if (preTEMP[i][j][k] != no_val_TEMP[0])
-            TEMP[rec][i][j][k] = (preTEMP[i][j][k] * scale_factor_TEMP[0])
-              + add_offset_TEMP[0];
+          if (preV[i][j][k] != no_val_V[0])
+            V[rec][i][j][k] = (preV[i][j][k] * scale_factor_V[0])
+              + add_offset_V[0];
           else
-            TEMP[rec][i][j][k] = no_val_TEMP[0];
+            V[rec][i][j][k] = no_val_V[0];
 
-          if (preSALT[i][j][k] != no_val_SALT[0])
-            SALT[rec][i][j][k] = (preSALT[i][j][k] * scale_factor_SALT[0])
-              + add_offset_SALT[0];
+          if (preU[i][j][k] != no_val_U[0])
+            U[rec][i][j][k] = (preU[i][j][k] * scale_factor_U[0])
+              + add_offset_U[0];
           else
-            SALT[rec][i][j][k] = no_val_SALT[0];
+            U[rec][i][j][k] = no_val_U[0];
           }
         }
       }
@@ -620,7 +618,7 @@ int main(int argc, char **argv){
     // 5. ENSURE CORRECT UNITS
     //---------------------------------------------------------------
     NcVarAtt unitsAtt;
-    string depthUnits, latUnits, lonUnits, saltUnits, tempUnits;
+    string depthUnits, latUnits, lonUnits, uUnits, vUnits;
 
     //---------------------------------------------------------------
     // 5.1: Depth
@@ -659,26 +657,26 @@ int main(int argc, char **argv){
       }
 
     //---------------------------------------------------------------
-    // 5.4: Salinity
-    unitsAtt = saltVar.getAtt("units");
+    // 5.4: Velocity (U)
+    unitsAtt = uVar.getAtt("units");
     if(unitsAtt.isNull()) return NC_ERR;
    
-    unitsAtt.getValues(saltUnits);
-    if (saltUnits != "psu")
+    unitsAtt.getValues(uUnits);
+    if (uUnits != "m/s")
       {
-        cout<<"WARNING! salinity units = "<<saltUnits<<endl;
+        cout<<"WARNING! velocity (u) units = "<<uUnits<<endl;
         return NC_ERR;
       }
 
     //---------------------------------------------------------------
-    // 5.5: Temperature
-    unitsAtt = tempVar.getAtt("units");
+    // 5.5: Velocity (V)
+    unitsAtt = vVar.getAtt("units");
     if(unitsAtt.isNull()) return NC_ERR;
    
-    unitsAtt.getValues(tempUnits);
-    if (tempUnits != "degC")
+    unitsAtt.getValues(vUnits);
+    if (vUnits != "m/s")
       {
-        cout<<"WARNING! temperature units = "<<tempUnits<<endl;
+        cout<<"WARNING! velocity (v) units = "<<vUnits<<endl;
         return NC_ERR;
       }
 
@@ -689,9 +687,9 @@ int main(int argc, char **argv){
     cout << "* NETCDF DATA READ SUCCESSFUL! *\n";
     cout << "--------------------------------\n";
     cout << "ARRAYS CREATED:\n";
-    cout << "  SALT[" << ntime << "][" << depth_ind_range << "]["
+    cout << "  U[" << ntime << "][" << depth_ind_range << "]["
          << lat_ind_range << "][" << lon_ind_range << "]\n";
-    cout << "  TEMP[" << ntime << "][" << depth_ind_range << "]["
+    cout << "  V[" << ntime << "][" << depth_ind_range << "]["
          << lat_ind_range << "][" << lon_ind_range << "]\n";
     cout << endl;
 
@@ -709,13 +707,13 @@ int main(int argc, char **argv){
 
     //---------------------------------------------------------------
     // 6.0.1: Define variable names
-    string FILE_NAME  = "../data/salt_temp_4D.nc";
+    string FILE_NAME  = "../data/velocity_4D.nc";
     string TIME_NAME  = "time";
     string DEPTH_NAME = "depth";
     string LAT_NAME   = "lat";
     string LON_NAME   = "lon";
-    string SALT_NAME  = "salinity";
-    string TEMP_NAME  = "water_temp";
+    string U_NAME  = "water_u";
+    string V_NAME  = "water_v";
 
     //---------------------------------------------------------------
     // 6.0.2: Define coordinate (independent) variable sizes
@@ -730,8 +728,8 @@ int main(int argc, char **argv){
     string DEPTH_UNITS = "m";
     string LAT_UNITS   = latUnits;
     string LON_UNITS   = lonUnits;
-    string SALT_UNITS  = saltUnits;
-    string TEMP_UNITS  = tempUnits;
+    string U_UNITS     = uUnits;
+    string V_UNITS     = vUnits;
 
     //---------------------------------------------------------------
     // 6.0.4: Define variable scale and offsets
@@ -777,8 +775,8 @@ int main(int argc, char **argv){
     dimVector.push_back(latDimOut);
     dimVector.push_back(lonDimOut);
 
-    NcVar saltVarOut = subsample.addVar(SALT_NAME, ncShort, dimVector);
-    NcVar tempVarOut = subsample.addVar(TEMP_NAME, ncShort, dimVector);
+    NcVar uVarOut = subsample.addVar(U_NAME, ncShort, dimVector);
+    NcVar vVarOut = subsample.addVar(V_NAME, ncShort, dimVector);
 
     cout << "-> Data variables allocated." << endl;
 
@@ -831,28 +829,27 @@ int main(int argc, char **argv){
     lonVarOut.putAtt("axis", "X");
     lonVarOut.putAtt("NAVO_code", ncInt, 2);
 
-    // Salinity:
-    saltVarOut.putAtt("_CoordinateAxes", "time depth lat lon");
-    saltVarOut.putAtt("long_name", "Salinity");
-    saltVarOut.putAtt("standard_name", "sea_water_salinity");
-    saltVarOut.putAtt("units", SALT_UNITS);
-    saltVarOut.putAtt("Fill_Value", ncShort, NO_VALUE);
-    saltVarOut.putAtt("missing_value", ncShort, NO_VALUE);
-    saltVarOut.putAtt("scale_factor", ncFloat, SCALE_FACTOR);
-    saltVarOut.putAtt("add_offset", ncFloat, ADD_OFFSET);
-    saltVarOut.putAtt("NAVO_code", ncInt, 16);
+    // Velocity (U):
+    uVarOut.putAtt("_CoordinateAxes", "time depth lat lon");
+    uVarOut.putAtt("long_name", "Eastward Water Velocity");
+    uVarOut.putAtt("standard_name", "eastward_sea_water_velocity");
+    uVarOut.putAtt("units", U_UNITS);
+    uVarOut.putAtt("Fill_Value", ncShort, NO_VALUE);
+    uVarOut.putAtt("missing_value", ncShort, NO_VALUE);
+    uVarOut.putAtt("scale_factor", ncFloat, SCALE_FACTOR);
+    uVarOut.putAtt("add_offset", ncFloat, ADD_OFFSET);
+    uVarOut.putAtt("NAVO_code", ncInt, 17);
 
-    // Temperature:
-    tempVarOut.putAtt("_CoordinateAxes", "time depth lat lon");
-    tempVarOut.putAtt("long_name", "Water Temperature");
-    tempVarOut.putAtt("standard_name", "sea_water_temperature");
-    tempVarOut.putAtt("units", TEMP_UNITS);
-    tempVarOut.putAtt("Fill_Value", ncShort, NO_VALUE);
-    tempVarOut.putAtt("missing_value", ncShort, NO_VALUE);
-    tempVarOut.putAtt("scale_factor", ncFloat, SCALE_FACTOR);
-    tempVarOut.putAtt("add_offset", ncFloat, ADD_OFFSET);
-    tempVarOut.putAtt("NAVO_code", ncInt, 15);
-    tempVarOut.putAtt("comment", "in-situ temperature");
+    // Velocity (V):
+    vVarOut.putAtt("_CoordinateAxes", "time depth lat lon");
+    vVarOut.putAtt("long_name", "Northward Water Velocity");
+    vVarOut.putAtt("standard_name", "northward_sea_water_velocity");
+    vVarOut.putAtt("units", V_UNITS);
+    vVarOut.putAtt("Fill_Value", ncShort, NO_VALUE);
+    vVarOut.putAtt("missing_value", ncShort, NO_VALUE);
+    vVarOut.putAtt("scale_factor", ncFloat, SCALE_FACTOR);
+    vVarOut.putAtt("add_offset", ncFloat, ADD_OFFSET);
+    vVarOut.putAtt("NAVO_code", ncInt, 18);
 
     cout << "-> Variable attributes written." << endl;
 
@@ -881,8 +878,6 @@ int main(int argc, char **argv){
 
     //---------------------------------------------------------------
     // 6.4.1: Fill data (dependent) VARIABLES
-    //short shortSALT[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
-    //short shortTEMP[ntime][depth_ind_range][lat_ind_range][lon_ind_range];
     
     vector<size_t> startp_write, countp_write;
     startp_write.push_back(0);
@@ -897,37 +892,31 @@ int main(int argc, char **argv){
     for (int rec=0; rec<ntime; rec++){
       startp_write[0] = rec;
 
-      short shortSALT[depth_ind_range][lat_ind_range][lon_ind_range];
-      short shortTEMP[depth_ind_range][lat_ind_range][lon_ind_range];
+      short shortU[depth_ind_range][lat_ind_range][lon_ind_range];
+      short shortV[depth_ind_range][lat_ind_range][lon_ind_range];
 
       for (int i=0; i<depth_ind_range; i++){
         for (int j=0; j<lat_ind_range; j++){
           for (int k=0; k<lon_ind_range; k++){
 
-            if (TEMP[rec][i][j][k] != NO_VALUE)
-              //shortTEMP[rec][i][j][k] = (TEMP[rec][i][j][k]-ADD_OFFSET)
-              //  /SCALE_FACTOR;
-              shortTEMP[i][j][k] = (TEMP[rec][i][j][k]-ADD_OFFSET)
+            if (V[rec][i][j][k] != NO_VALUE)
+              shortV[i][j][k] = (V[rec][i][j][k]-ADD_OFFSET)
                 /SCALE_FACTOR;
             else
-              //shortTEMP[rec][i][j][k] = NO_VALUE;
-              shortTEMP[i][j][k] = NO_VALUE;
+              shortV[i][j][k] = NO_VALUE;
 
-            if (SALT[rec][i][j][k] != NO_VALUE)
-              //shortSALT[rec][i][j][k] = (SALT[rec][i][j][k]-ADD_OFFSET)
-              //  /SCALE_FACTOR;
-              shortSALT[i][j][k] = (SALT[rec][i][j][k]-ADD_OFFSET)
+            if (U[rec][i][j][k] != NO_VALUE)
+              shortU[i][j][k] = (U[rec][i][j][k]-ADD_OFFSET)
                 /SCALE_FACTOR;
             else
-              //shortSALT[rec][i][j][k] = NO_VALUE;
-              shortSALT[i][j][k] = NO_VALUE;
+              shortU[i][j][k] = NO_VALUE;
 
           }
         }
       }
 
-      saltVarOut.putVar(startp_write,countp_write,shortSALT);
-      tempVarOut.putVar(startp_write,countp_write,shortTEMP);
+      uVarOut.putVar(startp_write,countp_write,shortU);
+      vVarOut.putVar(startp_write,countp_write,shortV);
     }
 
     cout << "-> Data variables written." << endl;
